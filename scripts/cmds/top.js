@@ -1,7 +1,6 @@
 const fs = require("fs");
 const { createCanvas } = require("canvas");
 const axios = require("axios");
-const { getUsername } = require("../../utils/getUsername.js");
 const { toBold } = require("../../utils/toBold.js");
 
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
@@ -150,7 +149,7 @@ async function generateTopImage(users, page, totalPages) {
 module.exports = {
     config: {
         name: "top",
-        version: "6.1",
+        version: "6.2",
         author: "Itachi Soma",
         role: 0,
         shortDescription: { en: "Top richest users" },
@@ -178,7 +177,6 @@ module.exports = {
         const endIndex = startIndex + usersPerPage;
         const usersOnPage = allUsers.slice(startIndex, endIndex);
 
-        // ✅ Récupérer tous les membres du thread en une seule requête
         let threadMembersMap = {};
         try {
             const threadInfo = await api.getThreadInfo(event.threadID);
@@ -196,14 +194,20 @@ module.exports = {
         const enrichedUsers = [];
         for (const user of usersOnPage) {
             try {
-                // 1. Chercher dans les membres du thread (le plus fiable)
                 let name = threadMembersMap[user.userId];
-
-                // 2. Fallback : getUsername classique
-                if (!name || name === user.userId) {
-                    name = await getUsername(user.userId, api, usersData);
+                if (!name || name === user.userId || name === "Facebook User") {
+                    if (usersData && typeof usersData.getName === 'function') {
+                        try {
+                            const localName = await usersData.getName(user.userId);
+                            if (localName && localName !== user.userId && localName !== "Facebook User" && localName !== "Utilisateur") {
+                                name = localName;
+                            }
+                        } catch (e) {}
+                    }
                 }
-
+                if (!name || name === user.userId || name === "Facebook User" || name === "Utilisateur") {
+                    name = `User_${String(user.userId).slice(-5)}`;
+                }
                 const cashAmount = toBigInt(user.cash || 0);
                 const formattedCash = await formatNumberWithAPI(cashAmount);
                 enrichedUsers.push({
@@ -222,7 +226,6 @@ module.exports = {
             }
         }
 
-        // Message texte
         let textMsg = toBold("📝 TOP 50 - LES PLUS RICHES") + `\n━━━━━━━━━━━━━━━━━━\n`;
         enrichedUsers.forEach((user, index) => {
             const rank = startIndex + index + 1;
@@ -233,7 +236,6 @@ module.exports = {
 
         await message.reply(textMsg);
 
-        // Génération de l'image
         try {
             const img = await generateTopImage(enrichedUsers, page, totalPages);
             const imgPath = `./top_${Date.now()}.png`;
