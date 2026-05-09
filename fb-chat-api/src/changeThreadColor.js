@@ -3,59 +3,51 @@
 var utils = require("../utils");
 var log = require("npmlog");
 
-module.exports = function (defaultFuncs, api, ctx) {
+module.exports = function(defaultFuncs, api, ctx) {
   return function changeThreadColor(color, threadID, callback) {
-    var resolveFunc = function () { };
-    var rejectFunc = function () { };
-    var returnPromise = new Promise(function (resolve, reject) {
-      resolveFunc = resolve;
-      rejectFunc = reject;
-    });
-
     if (!callback) {
-      callback = function (err) {
-        if (err) return rejectFunc(err);
-        resolveFunc(err);
-      };
+      callback = function() {};
     }
 
     var validatedColor = color !== null ? color.toLowerCase() : color; // API only accepts lowercase letters in hex string
-    var colorList = Object.keys(api.threadColors).map(function (name) {
+    var colorList = Object.keys(api.threadColors).map(function(name) {
       return api.threadColors[name];
     });
-    if (!colorList.includes(validatedColor)) throw { error: "The color you are trying to use is not a valid thread color. Use api.threadColors to find acceptable values." };
+    if (!colorList.includes(validatedColor)) {
+      throw {
+        error:
+          "The color you are trying to use is not a valid thread color. Use api.threadColors to find acceptable values."
+      };
+    }
 
     var form = {
-      dpr: 1,
-      queries: JSON.stringify({
-        o0: {
-          //This doc_id is valid as of January 31, 2020
-          doc_id: "1727493033983591",
-          query_params: {
-            data: {
-              actor_id: ctx.userID,
-              client_mutation_id: "0",
-              source: "SETTINGS",
-              theme_id: validatedColor,
-              thread_id: threadID
-            }
-          }
-        }
-      })
+      color_choice: validatedColor,
+      thread_or_other_fbid: threadID
     };
 
     defaultFuncs
-      .post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
+      .post(
+        "https://www.facebook.com/messaging/save_thread_color/?source=thread_settings&dpr=1",
+        ctx.jar,
+        form
+      )
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-      .then(function (resData) {
-        if (resData[resData.length - 1].error_results > 0) throw resData[0].o0.errors;
+      .then(function(resData) {
+        if (resData.error === 1357031) {
+          throw {
+            error:
+              "Trying to change colors of a chat that doesn't exist. Have at least one message in the thread before trying to change the colors."
+          };
+        }
+        if (resData.error) {
+          throw resData;
+        }
+
         return callback();
       })
-      .catch(function (err) {
+      .catch(function(err) {
         log.error("changeThreadColor", err);
         return callback(err);
       });
-
-    return returnPromise;
   };
 };
