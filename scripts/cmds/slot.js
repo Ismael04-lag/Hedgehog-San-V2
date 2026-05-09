@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const { createCanvas } = require("canvas");
+
 const CONVERT_API_URL = "https://numbers-conversion.vercel.app/api/parse";
 const CASH_API_URL = "https://cash-api-five.vercel.app/api/cash";
 
@@ -24,22 +25,64 @@ async function sendRemoteSound(url, message) {
     }
 }
 
+function toBigInt(value) {
+    if (typeof value === 'bigint') return value;
+    if (value === undefined || value === null) return 0n;
+    try {
+        return BigInt(String(value).split('.')[0]);
+    } catch {
+        return 0n;
+    }
+}
+
+function isInfinity(value) {
+    if (typeof value === 'bigint') return value > BigInt("9".repeat(260));
+    return !isFinite(Number(value)) || Number(value) >= 1e260;
+}
+
+function formatBigInt(num) {
+    if (isInfinity(num)) return "∞";
+    if (num === 0n) return "0";
+    const suffixes = ["", "k", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+    let i = 0;
+    let scaled = num;
+    const thousand = 1000n;
+    while (scaled >= thousand && i < suffixes.length - 1) {
+        scaled = scaled / thousand;
+        i++;
+    }
+    const remainder = i > 0 ? (num % (thousand ** BigInt(i))) / (thousand ** BigInt(i - 1)) : 0n;
+    if (i > 0 && remainder > 0n) return `${scaled}.${remainder}${suffixes[i]}`;
+    return `${scaled}${suffixes[i]}`;
+}
+
+async function formatNumber(num) {
+    if (isInfinity(num)) return "∞";
+    const bigNum = toBigInt(num);
+    try {
+        const response = await axios.get(`${CONVERT_API_URL}?number=${bigNum.toString()}`);
+        if (response.data && response.data.success) return response.data.formatted;
+    } catch (error) {}
+    return formatBigInt(bigNum);
+}
+
 async function getUserCash(userId) {
     try {
         const response = await axios.get(`${CASH_API_URL}/${userId}`);
-        if (response.data.success) return response.data.data.cash;
+        if (response.data.success) return toBigInt(response.data.data.cash);
     } catch (error) {
         console.error("Cash API Error:", error.message);
     }
-    return 0;
+    return 0n;
 }
 
 async function updateUserCash(userId, amount) {
     try {
-        if (amount >= 0) {
-            await axios.post(`${CASH_API_URL}/${userId}/add`, { amount });
+        const bigAmount = toBigInt(amount);
+        if (bigAmount >= 0n) {
+            await axios.post(`${CASH_API_URL}/${userId}/add`, { amount: bigAmount.toString() });
         } else {
-            await axios.post(`${CASH_API_URL}/${userId}/subtract`, { amount: Math.abs(amount) });
+            await axios.post(`${CASH_API_URL}/${userId}/subtract`, { amount: (-bigAmount).toString() });
         }
     } catch (error) {
         console.error("Cash API Update Error:", error.message);
@@ -68,18 +111,48 @@ async function saveCooldowns() {
 }
 
 function getDisplaySymbols(slots) {
-    const map = {
-        "🤍": "◯",
-        "🖤": "✕",
-        "💚": "◆"
-    };
+    const map = { "🤍": "◯", "🖤": "✕", "💚": "◆" };
     return slots.map(e => map[e] || e);
 }
+
+function calculateWinnings(slot1, slot2, slot3, betAmount) {
+    const bet = toBigInt(betAmount);
+    if (slot1 === "🤍" && slot2 === "🤍" && slot3 === "🤍") {
+        return { win: true, winAmount: bet * 10n, multiplier: 10 };
+    } else if (slot1 === "🖤" && slot2 === "🖤" && slot3 === "🖤") {
+        return { win: true, winAmount: bet * 5n, multiplier: 5 };
+    } else if (slot1 === slot2 && slot2 === slot3) {
+        return { win: true, winAmount: bet * 3n, multiplier: 3 };
+    } else if (slot1 === slot2 || slot1 === slot3 || slot2 === slot3) {
+        return { win: true, winAmount: bet * 2n, multiplier: 2 };
+    } else {
+        return { win: false, winAmount: -bet, multiplier: 0 };
+    }
+}
+
+// -------- Fonction locale pour obtenir le nom d'utilisateur (sans getUsername) --------
+function getUserName(uid, api) {
+    return new Promise((resolve) => {
+        api.getUserInfo(uid, (err, data) => {
+            if (err || !data || !data[uid]) {
+                resolve(`User_${String(uid).slice(-5)}`);
+            } else {
+                const name = data[uid].name;
+                if (name && name !== "Facebook User" && name !== "Utilisateur") {
+                    resolve(name);
+                } else {
+                    resolve(`User_${String(uid).slice(-5)}`);
+                }
+            }
+        });
+    });
+}
+// ----------------------------------------------------------------------------------
 
 module.exports = {
     config: {
         name: "slot",
-        version: "2.7",
+        version: "3.1",
         author: "Itachi Soma",
         countDown: 3,
         role: 0,
@@ -88,41 +161,42 @@ module.exports = {
         longDescription: { en: "Play slot machine with your money! Jackpot x10, x5, x3, x2. 15 spins per 30 minutes." }
     },
 
-    onStart: async function ({ args, message, event, api }) {
+    onStart: async function ({ args, message, event, api, usersData }) {
         const { senderID } = event;
         const userMoney = await getUserCash(senderID);
 
         async function parseAmountWithSuffix(input) {
-            if (!input) return NaN;
+            if (!input) return 0n;
+            const strInput = String(input).toLowerCase().trim();
             try {
-                const response = await fetch(`${CONVERT_API_URL}?input=${encodeURIComponent(input)}`);
-                const data = await response.json();
-                if (data.success && typeof data.result === 'number') {
-                    return data.result;
+                const response = await axios.get(`${CONVERT_API_URL}?input=${encodeURIComponent(strInput)}`);
+                if (response.data && response.data.success && response.data.result) {
+                    return toBigInt(response.data.result);
                 }
-            } catch (error) {
-                console.error("Conversion API error, fallback to local parser:", error);
-            }
-            const str = String(input).toLowerCase().replace(/\s/g, '');
+            } catch (error) {}
             const SUFFIXES = {
-                'k': 1e3, 'm': 1e6, 'b': 1e9, 't': 1e12, 'q': 1e15,
-                'Q': 1e18, 's': 1e21, 'S': 1e24, 'o': 1e27, 'n': 1e30, 'd': 1e33
+                'k': 1_000n, 'm': 1_000_000n, 'b': 1_000_000_000n,
+                't': 1_000_000_000_000n, 'q': 1_000_000_000_000_000n,
+                'Q': 1_000_000_000_000_000_000n,
+                's': 1_000_000_000_000_000_000_000n,
+                'S': 1_000_000_000_000_000_000_000_000n,
+                'o': 1_000_000_000_000_000_000_000_000_000n,
+                'n': 1_000_000_000_000_000_000_000_000_000_000n,
+                'd': 1_000_000_000_000_000_000_000_000_000_000_000n
             };
-            const scientificMatch = str.match(/^(\d+(?:\.\d+)?)e(\d+)$/i);
+            const scientificMatch = strInput.match(/^(\d+(?:\.\d+)?)e(\d+)$/i);
             if (scientificMatch) {
-                return Math.floor(parseFloat(scientificMatch[1]) * Math.pow(10, parseInt(scientificMatch[2])));
+                return toBigInt(Math.floor(parseFloat(scientificMatch[1]) * Math.pow(10, parseInt(scientificMatch[2]))));
             }
-            const suffixChars = Object.keys(SUFFIXES).join('');
-            const regex = new RegExp(`^(\\d+(?:\\.\\d+)?)([${suffixChars}]?)$`, 'i');
-            const match = str.match(regex);
-            if (!match) return parseFloat(str);
-            let value = parseFloat(match[1]);
-            const suffix = match[2]?.toLowerCase();
-            if (isNaN(value)) return NaN;
+            const match = strInput.match(/^(\d+(?:\.\d+)?)([a-zA-Z]?)$/);
+            if (!match) return 0n;
+            const value = parseFloat(match[1]);
+            const suffix = match[2];
+            if (isNaN(value)) return 0n;
             if (suffix && SUFFIXES[suffix]) {
-                value *= SUFFIXES[suffix];
+                return toBigInt(Math.floor(value)) * SUFFIXES[suffix];
             }
-            return Math.floor(value);
+            return toBigInt(Math.floor(value));
         }
 
         const amount = await parseAmountWithSuffix(args[0]);
@@ -134,26 +208,8 @@ module.exports = {
         }
 
         const userBank = bankData[senderID] || { bank: 0, imageMode: true };
-        const userInfo = await api.getUserInfo(senderID);
-        const username = userInfo[senderID].name;
-
-        function formatNumber(num) {
-            if (num === null || num === undefined || isNaN(num)) return "0";
-            const suffixes = [
-                { value: 1e33, suffix: 'd' }, { value: 1e30, suffix: 'n' }, { value: 1e27, suffix: 'o' },
-                { value: 1e24, suffix: 'S' }, { value: 1e21, suffix: 's' }, { value: 1e18, suffix: 'Q' },
-                { value: 1e15, suffix: 'q' }, { value: 1e12, suffix: 't' }, { value: 1e9, suffix: 'b' },
-                { value: 1e6, suffix: 'm' }, { value: 1e3, suffix: 'k' }
-            ];
-            const absNum = Math.abs(num);
-            const sign = num < 0 ? "-" : "";
-            for (const s of suffixes) {
-                if (absNum >= s.value) {
-                    return sign + (absNum / s.value).toFixed(1).replace(/\.0$/, '') + s.suffix;
-                }
-            }
-            return sign + absNum.toString();
-        }
+        // Remplacer getUsername par getUserName
+        const username = await getUserName(senderID, api);
 
         function formatTimeRemaining(ms) {
             const minutes = Math.floor(ms / 60000);
@@ -163,17 +219,12 @@ module.exports = {
 
         function getSlotCooldown(userId) {
             if (!slotCooldowns.has(userId)) {
-                slotCooldowns.set(userId, {
-                    spins: 15,
-                    maxSpins: 15,
-                    resetTime: Date.now() + 30 * 60 * 1000
-                });
+                slotCooldowns.set(userId, { spins: 15, maxSpins: 15, resetTime: Date.now() + 30 * 60 * 1000 });
                 saveCooldowns();
             }
             const cooldown = slotCooldowns.get(userId);
             const now = Date.now();
             if (now > cooldown.resetTime) {
-                console.log(`[SLOT] Réinitialisation des tours pour ${userId}`);
                 cooldown.spins = cooldown.maxSpins;
                 cooldown.resetTime = now + 30 * 60 * 1000;
                 slotCooldowns.set(userId, cooldown);
@@ -206,14 +257,14 @@ module.exports = {
         if (args[0]?.toLowerCase() === "stats") {
             const stats = getRemainingSpins(senderID);
             const progressBar = "█".repeat(Math.floor(stats.spins / stats.maxSpins * 20)) +
-                               "░".repeat(20 - Math.floor(stats.spins / stats.maxSpins * 20));
+                "░".repeat(20 - Math.floor(stats.spins / stats.maxSpins * 20));
             return message.reply(
-                `🎰 𝐒𝐋𝐎𝐓 𝐒𝐓𝐀𝐓𝐒\n` +
+                `🎰 SLOT STATS\n` +
                 `━━━━━━━━━━━━━━━━\n` +
-                `🎲 𝐓𝐨𝐮𝐫𝐬 𝐫𝐞𝐬𝐭𝐚𝐧𝐭𝐬 : ${stats.spins}/${stats.maxSpins}\n` +
+                `🎲 Tours restants : ${stats.spins}/${stats.maxSpins}\n` +
                 `📊 ${progressBar}\n` +
                 `━━━━━━━━━━━━━━━━\n` +
-                `⏰ 𝐑𝐞𝐜𝐡𝐚𝐫𝐠𝐞𝐦𝐞𝐧𝐭 𝐝𝐚𝐧𝐬 : ${formatTimeRemaining(stats.timeRemaining)}\n` +
+                `⏰ Rechargement dans : ${formatTimeRemaining(stats.timeRemaining)}\n` +
                 `━━━━━━━━━━━━━━━━`
             );
         }
@@ -221,12 +272,12 @@ module.exports = {
         const spinStats = getRemainingSpins(senderID);
         if (spinStats.spins <= 0) {
             return message.reply(
-                `❌ 𝐏𝐥𝐮𝐬 𝐝𝐞 𝐭𝐨𝐮𝐫𝐬 𝐝𝐢𝐬𝐩𝐨𝐧𝐢𝐛𝐥𝐞𝐬 !\n` +
+                `❌ Plus de tours disponibles !\n` +
                 `━━━━━━━━━━━━━━━━\n` +
-                `🎰 𝐕𝐨𝐮𝐬 𝐚𝐯𝐞𝐳 𝐮𝐭𝐢𝐥𝐢𝐬𝐞́ 𝐯𝐨𝐬 𝟏5 𝐭𝐨𝐮𝐫𝐬.\n` +
-                `⏰ 𝐑𝐞𝐜𝐡𝐚𝐫𝐠𝐞𝐦𝐞𝐧𝐭 𝐝𝐚𝐧𝐬 : ${formatTimeRemaining(spinStats.timeRemaining)}\n` +
+                `🎰 Vous avez utilisé vos 15 tours.\n` +
+                `⏰ Rechargement dans : ${formatTimeRemaining(spinStats.timeRemaining)}\n` +
                 `━━━━━━━━━━━━━━━━\n` +
-                `📊 𝐓𝐚𝐩𝐞𝐳 ~𝐬𝐥𝐨𝐭 𝐬𝐭𝐚𝐭𝐬 𝐩𝐨𝐮𝐫 𝐯𝐨𝐢𝐫 𝐯𝐨𝐬 𝐬𝐭𝐚𝐭𝐢𝐬𝐭𝐢𝐪𝐮𝐞𝐬.`
+                `📊 Tapez ~slot stats pour voir vos statistiques.`
             );
         }
 
@@ -275,18 +326,18 @@ module.exports = {
             ctx.fillText(`Tours restants: ${remainingSpins}/15`, 380, 265);
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 28px 'Courier New'";
-            ctx.fillText(`${formatNumber(newBalance)}$`, 30, 315);
+            ctx.fillText(`${await formatNumber(newBalance)}$`, 30, 315);
             ctx.fillStyle = "#aaa";
             ctx.font = "10px 'Courier New'";
             ctx.fillText("NEW BALANCE", 30, 340);
             if (win) {
                 ctx.fillStyle = "#00ff88";
                 ctx.font = "bold 16px 'Courier New'";
-                ctx.fillText(`GAIN: +${formatNumber(winAmount)}$`, 380, 315);
+                ctx.fillText(`GAIN: +${await formatNumber(winAmount)}$`, 380, 315);
             } else {
                 ctx.fillStyle = "#ff4444";
                 ctx.font = "bold 16px 'Courier New'";
-                ctx.fillText(`PERTE: -${formatNumber(amount)}$`, 380, 315);
+                ctx.fillText(`PERTE: -${await formatNumber(amount)}$`, 380, 315);
             }
             ctx.fillStyle = "#d4af37";
             ctx.font = "bold 14px 'Courier New'";
@@ -301,12 +352,22 @@ module.exports = {
             return canvas.toBuffer();
         }
 
-        if (isNaN(amount) || amount <= 0) {
-            return message.reply(`❌ 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 𝐢𝐧𝐯𝐚𝐥𝐢𝐝𝐞\n━━━━━━━━━━━━━━━━\n📝 𝐔𝐭𝐢𝐥𝐢𝐬𝐚𝐭𝐢𝐨𝐧 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 <𝐦𝐨𝐧𝐭𝐚𝐧𝐭>\n💳 𝐄𝐱𝐞𝐦𝐩𝐥𝐞 : ${global.utils.getPrefix(event.threadID)}𝐬𝐥𝐨𝐭 𝟓𝟎𝐤`);
+        if (amount <= 0n) {
+            return message.reply(
+                `❌ Montant invalide\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `📝 Utilisation : ${global.utils.getPrefix(event.threadID)}slot <montant>\n` +
+                `💳 Exemple : ${global.utils.getPrefix(event.threadID)}slot 50k`
+            );
         }
 
         if (amount > userMoney) {
-            return message.reply(`❌ 𝐅𝐨𝐧𝐝𝐬 𝐢𝐧𝐬𝐮𝐟𝐟𝐢𝐬𝐚𝐧𝐭𝐬\n━━━━━━━━━━━━━━━━\n💰 𝐓𝐨𝐧 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(userMoney)}$\n🎰 𝐌𝐨𝐧𝐭𝐚𝐧𝐭 : ${formatNumber(amount)}$`);
+            return message.reply(
+                `❌ Fonds insuffisants\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `💰 Ton solde : ${await formatNumber(userMoney)}$\n` +
+                `🎰 Montant : ${await formatNumber(amount)}$`
+            );
         }
 
         const emojiSlots = ["🤍", "🖤", "💚", "🖤", "🤍", "💚", "💚", "🖤", "🤍"];
@@ -323,29 +384,32 @@ module.exports = {
 
         await updateUserCash(senderID, winAmount);
         const newBalance = await getUserCash(senderID);
-
         const updatedStats = getRemainingSpins(senderID);
+
+        const formattedWinAmount = await formatNumber(win ? winAmount : -winAmount);
+        const formattedNewBalance = await formatNumber(newBalance);
+        const formattedAmount = await formatNumber(amount);
 
         let resultMsg = "";
         if (win) {
-            resultMsg = `🎉 𝐕𝐈𝐂𝐓𝐎𝐈𝐑𝐄 ! 🎉\n━━━━━━━━━━━━━━━━\n✨ 𝐆𝐚𝐢𝐧 : +${formatNumber(winAmount)}$ (𝐱${multiplier})\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
+            resultMsg = `🎉 VICTOIRE ! 🎉\n━━━━━━━━━━━━━━━━\n✨ Gain : +${formattedWinAmount}$ (x${multiplier})\n💰 Nouveau solde : ${formattedNewBalance}$`;
         } else {
-            resultMsg = `💀 𝐏𝐄𝐑𝐃𝐔 ... 💀\n━━━━━━━━━━━━━━━━\n📉 𝐏𝐞𝐫𝐭𝐞 : -${formatNumber(amount)}$\n💰 𝐍𝐨𝐮𝐯𝐞𝐚𝐮 𝐬𝐨𝐥𝐝𝐞 : ${formatNumber(newBalance)}$`;
+            resultMsg = `💀 PERDU ... 💀\n━━━━━━━━━━━━━━━━\n📉 Perte : -${formattedAmount}$\n💰 Nouveau solde : ${formattedNewBalance}$`;
         }
 
         await sendRemoteSound(getTicTacSoundURL(), message);
         await new Promise(r => setTimeout(r, 5000));
 
         await message.reply(
-`🎰 𝐒𝐋𝐎𝐓 𝐌𝐀𝐂𝐇𝐈𝐍𝐄 🎰
+`🎰 SLOT MACHINE 🎰
 ━━━━━━━━━━━━━━━━
 🎲 [ ${slot1} | ${slot2} | ${slot3} ]
 ━━━━━━━━━━━━━━━━
-💰 𝐌𝐢𝐬𝐞 : ${formatNumber(amount)}$
+💰 Mise : ${formattedAmount}$
 ━━━━━━━━━━━━━━━━
 ${resultMsg}
 ━━━━━━━━━━━━━━━━
-🎰 𝐓𝐨𝐮𝐫𝐬 𝐫𝐞𝐬𝐭𝐚𝐧𝐭𝐬 : ${updatedStats.spins}/${updatedStats.maxSpins}
+🎰 Tours restants : ${updatedStats.spins}/${updatedStats.maxSpins}
 ━━━━━━━━━━━━━━━━`
         );
 
@@ -359,19 +423,13 @@ ${resultMsg}
             try {
                 const displaySlots = getDisplaySymbols([slot1, slot2, slot3]);
                 const cardImage = await generateSlotCard(
-                    username,
-                    amount,
-                    win,
-                    winAmount,
-                    newBalance,
-                    displaySlots,
-                    multiplier,
-                    updatedStats.spins
+                    username, amount, win, winAmount,
+                    newBalance, displaySlots, multiplier, updatedStats.spins
                 );
                 const imgPath = `./slot_card_${senderID}.png`;
                 fs.writeFileSync(imgPath, cardImage);
                 await message.reply({
-                    body: "💳 𝐑𝐞𝐜𝐚𝐩𝐢𝐭𝐮𝐥𝐚𝐭𝐢𝐟 𝐬𝐮𝐫 𝐯𝐨𝐭𝐫𝐞 𝐜𝐚𝐫𝐭𝐞 𝐛𝐚𝐧𝐜𝐚𝐢𝐫𝐞 :",
+                    body: "💳 Recapitulatif sur votre carte bancaire :",
                     attachment: fs.createReadStream(imgPath)
                 });
                 fs.unlinkSync(imgPath);
@@ -381,17 +439,3 @@ ${resultMsg}
         }
     }
 };
-
-function calculateWinnings(slot1, slot2, slot3, betAmount) {
-    if (slot1 === "🤍" && slot2 === "🤍" && slot3 === "🤍") {
-        return { win: true, winAmount: betAmount * 10, multiplier: 10 };
-    } else if (slot1 === "🖤" && slot2 === "🖤" && slot3 === "🖤") {
-        return { win: true, winAmount: betAmount * 5, multiplier: 5 };
-    } else if (slot1 === slot2 && slot2 === slot3) {
-        return { win: true, winAmount: betAmount * 3, multiplier: 3 };
-    } else if (slot1 === slot2 || slot1 === slot3 || slot2 === slot3) {
-        return { win: true, winAmount: betAmount * 2, multiplier: 2 };
-    } else {
-        return { win: false, winAmount: -betAmount, multiplier: 0 };
-    }
-}
