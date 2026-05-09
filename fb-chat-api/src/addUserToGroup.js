@@ -3,27 +3,35 @@
 var utils = require("../utils");
 var log = require("npmlog");
 
-module.exports = function (defaultFuncs, api, ctx) {
+module.exports = function(defaultFuncs, api, ctx) {
   return function addUserToGroup(userID, threadID, callback) {
-    var resolveFunc = function () { };
-    var rejectFunc = function () { };
-    var returnPromise = new Promise(function (resolve, reject) {
-      resolveFunc = resolve;
-      rejectFunc = reject;
-    });
-
-    if (!callback && (utils.getType(threadID) === "Function" || utils.getType(threadID) === "AsyncFunction")) throw { error: "please pass a threadID as a second argument." };
+    if (
+      !callback &&
+      (utils.getType(threadID) === "Function" ||
+        utils.getType(threadID) === "AsyncFunction")
+    ) {
+      throw { error: "please pass a threadID as a second argument." };
+    }
 
     if (!callback) {
-      callback = function (err) {
-        if (err) return rejectFunc(err);
-        resolveFunc();
+      callback = function() {};
+    }
+
+    if (
+      utils.getType(threadID) !== "Number" &&
+      utils.getType(threadID) !== "String"
+    ) {
+      throw {
+        error:
+          "ThreadID should be of type Number or String and not " +
+          utils.getType(threadID) +
+          "."
       };
     }
 
-    if (utils.getType(threadID) !== "Number" && utils.getType(threadID) !== "String") throw { error: "ThreadID should be of type Number or String and not " + utils.getType(threadID) + "." };
-
-    if (utils.getType(userID) !== "Array") userID = [userID];
+    if (utils.getType(userID) !== "Array") {
+      userID = [userID];
+    }
 
     var messageAndOTID = utils.generateOfflineThreadingID();
     var form = {
@@ -54,24 +62,38 @@ module.exports = function (defaultFuncs, api, ctx) {
     };
 
     for (var i = 0; i < userID.length; i++) {
-      if (utils.getType(userID[i]) !== "Number" && utils.getType(userID[i]) !== "String") throw { error: "Elements of userID should be of type Number or String and not " + utils.getType(userID[i]) + "." };
-      form["log_message_data[added_participants][" + i + "]"] = "fbid:" + userID[i];
+      if (
+        utils.getType(userID[i]) !== "Number" &&
+        utils.getType(userID[i]) !== "String"
+      ) {
+        throw {
+          error:
+            "Elements of userID should be of type Number or String and not " +
+            utils.getType(userID[i]) +
+            "."
+        };
+      }
+
+      form["log_message_data[added_participants][" + i + "]"] =
+        "fbid:" + userID[i];
     }
 
     defaultFuncs
       .post("https://www.facebook.com/messaging/send/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-      .then(function (resData) {
-        if (!resData) throw { error: "Add to group failed." };
-        if (resData.error) throw resData;
+      .then(function(resData) {
+        if (!resData) {
+          throw { error: "Add to group failed." };
+        }
+        if (resData.error) {
+          throw resData;
+        }
 
         return callback();
       })
-      .catch(function (err) {
+      .catch(function(err) {
         log.error("addUserToGroup", err);
         return callback(err);
       });
-
-    return returnPromise;
   };
 };
