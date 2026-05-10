@@ -78,7 +78,7 @@
     "notes": "the value of timeInterval is seconds, url is the url you want to send the request to (automatically detected for hosting glitch or replit)"
   },
   "autoLoadScripts": {
-    "enable": true,
+    "enable": false,
     "ignoreCmds": "",
     "ignoreEvents": "",
     "notes": "this feature will automatically load the script when scripts have been changed, you can set ignoreCmds to ignore commands, ignoreEvents to ignore events, separate by comma or space, example: \"cmd1.js cmd2.js cmd3.js\" (without backslash)"
@@ -141,7 +141,7 @@
     "selfListen": false,
     "selfListenEvent": true,
     "autoMarkDelivery": false,
-    "autoReconnect": true,
+    "autoReconnect": false,
     "notes": "Document here: https://github.com/ntkhang03/fb-chat-api/blob/master/DOCS.md#apisetoptionsoptions "
   }
 }
