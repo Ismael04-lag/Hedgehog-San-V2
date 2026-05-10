@@ -3,24 +3,18 @@
 var utils = require("../utils");
 var log = require("npmlog");
 
-module.exports = function (defaultFuncs, api, ctx) {
+module.exports = function(defaultFuncs, api, ctx) {
   return function setTitle(newTitle, threadID, callback) {
-    if (!callback && (utils.getType(threadID) === "Function" || utils.getType(threadID) === "AsyncFunction"))
+    if (
+      !callback &&
+      (utils.getType(threadID) === "Function" ||
+        utils.getType(threadID) === "AsyncFunction")
+    ) {
       throw { error: "please pass a threadID as a second argument." };
-
-
-    var resolveFunc = function () { };
-    var rejectFunc = function () { };
-    var returnPromise = new Promise(function (resolve, reject) {
-      resolveFunc = resolve;
-      rejectFunc = reject;
-    });
+    }
 
     if (!callback) {
-      callback = function (err, data) {
-        if (err) return rejectFunc(err);
-        resolveFunc(data);
-      };
+      callback = function() {};
     }
 
     var messageAndOTID = utils.generateOfflineThreadingID();
@@ -28,6 +22,7 @@ module.exports = function (defaultFuncs, api, ctx) {
       client: "mercury",
       action_type: "ma-type:log-message",
       author: "fbid:" + ctx.userID,
+      thread_id: "",
       author_email: "",
       coordinates: "",
       timestamp: Date.now(),
@@ -55,16 +50,24 @@ module.exports = function (defaultFuncs, api, ctx) {
     defaultFuncs
       .post("https://www.facebook.com/messaging/set_thread_name/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-      .then(function (resData) {
-        if (resData.error && resData.error === 1545012) throw { error: "Cannot change chat title: Not member of chat." };
-        if (resData.error && resData.error === 1545003) throw { error: "Cannot set title of single-user chat." };
-        if (resData.error) throw resData;
+      .then(function(resData) {
+        if (resData.error && resData.error === 1545012) {
+          throw { error: "Cannot change chat title: Not member of chat." };
+        }
+
+        if (resData.error && resData.error === 1545003) {
+          throw { error: "Cannot set title of single-user chat." };
+        }
+
+        if (resData.error) {
+          throw resData;
+        }
+
         return callback();
       })
-      .catch(function (err) {
+      .catch(function(err) {
         log.error("setTitle", err);
         return callback(err);
       });
-    return returnPromise;
   };
 };
