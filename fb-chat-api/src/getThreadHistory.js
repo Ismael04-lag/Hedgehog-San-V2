@@ -29,10 +29,10 @@ function formatAttachmentsGraphQLResponse(attachment) {
         // @Undocumented
         attributionApp: attachment.attribution_app
           ? {
-            attributionAppID: attachment.attribution_app.id,
-            name: attachment.attribution_app.name,
-            logo: attachment.attribution_app.square_logo
-          }
+              attributionAppID: attachment.attribution_app.id,
+              name: attachment.attribution_app.name,
+              logo: attachment.attribution_app.square_logo
+            }
           : null
 
         // @TODO No idea what this is, should we expose it?
@@ -78,10 +78,10 @@ function formatAttachmentsGraphQLResponse(attachment) {
         // @Undocumented
         attributionApp: attachment.attribution_app
           ? {
-            attributionAppID: attachment.attribution_app.id,
-            name: attachment.attribution_app.name,
-            logo: attachment.attribution_app.square_logo
-          }
+              attributionAppID: attachment.attribution_app.id,
+              name: attachment.attribution_app.name,
+              logo: attachment.attribution_app.square_logo
+            }
           : null
       };
     case "MessageVideo":
@@ -103,6 +103,7 @@ function formatAttachmentsGraphQLResponse(attachment) {
         duration: attachment.playable_duration_in_ms,
         videoType: attachment.video_type.toLowerCase()
       };
+      break;
     case "MessageFile":
       return {
         type: "file",
@@ -144,15 +145,56 @@ function formatExtensibleAttachment(attachment) {
       url: attachment.story_attachment.url,
 
       title: attachment.story_attachment.title_with_entities.text,
-      description: attachment.story_attachment.description && attachment.story_attachment.description.text,
-      source: attachment.story_attachment.source == null ? null : attachment.story_attachment.source.text,
+      description:
+        attachment.story_attachment.description &&
+        attachment.story_attachment.description.text,
+      source:
+        attachment.story_attachment.source == null
+          ? null
+          : attachment.story_attachment.source.text,
 
-      image: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).uri,
-      width: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).width,
-      height: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).height,
-      playable: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.is_playable,
-      duration: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.playable_duration_in_ms,
-      playableUrl: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.playable_url,
+      image:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).uri,
+      width:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).width,
+      height:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).height,
+      playable:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.is_playable,
+      duration:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.playable_duration_in_ms,
+      playableUrl:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.playable_url,
 
       subattachments: attachment.story_attachment.subattachments,
 
@@ -169,22 +211,54 @@ function formatExtensibleAttachment(attachment) {
       //     width: "1280"
       //   }
       //
-      properties: attachment.story_attachment.properties.reduce(function (obj, cur) {
+      properties: attachment.story_attachment.properties.reduce(function(
+        obj,
+        cur
+      ) {
         obj[cur.key] = cur.value.text;
         return obj;
-      }, {}),
+      },
+      {}),
 
       // Deprecated fields
       animatedImageSize: "", // @Legacy
       facebookUrl: "", // @Legacy
       styleList: "", // @Legacy
       target: "", // @Legacy
-      thumbnailUrl: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).uri, // @Legacy
-      thumbnailWidth: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).width, // @Legacy
-      thumbnailHeight: attachment.story_attachment.media == null ? null : attachment.story_attachment.media.animated_image == null && attachment.story_attachment.media.image == null ? null : (attachment.story_attachment.media.animated_image || attachment.story_attachment.media.image).height // @Legacy
+      thumbnailUrl:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).uri, // @Legacy
+      thumbnailWidth:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).width, // @Legacy
+      thumbnailHeight:
+        attachment.story_attachment.media == null
+          ? null
+          : attachment.story_attachment.media.animated_image == null &&
+            attachment.story_attachment.media.image == null
+            ? null
+            : (
+                attachment.story_attachment.media.animated_image ||
+                attachment.story_attachment.media.image
+              ).height // @Legacy
     };
+  } else {
+    return { error: "Don't know what to do with extensible_attachment." };
   }
-  else return { error: "Don't know what to do with extensible_attachment." };
 }
 
 function formatReactionsGraphQL(reaction) {
@@ -195,18 +269,24 @@ function formatReactionsGraphQL(reaction) {
 }
 
 function formatEventData(event) {
-  if (event == null) return {}
+  if (event == null) {
+    return {};
+  }
 
   switch (event.__typename) {
     case "ThemeColorExtensibleMessageAdminText":
-      return { color: event.theme_color };
+      return {
+        color: event.theme_color
+      };
     case "ThreadNicknameExtensibleMessageAdminText":
       return {
         nickname: event.nickname,
         participantID: event.participant_id
       };
     case "ThreadIconExtensibleMessageAdminText":
-      return { threadIcon: event.thread_icon };
+      return {
+        threadIcon: event.thread_icon
+      };
     case "InstantGameUpdateExtensibleMessageAdminText":
       return {
         gameID: (event.game == null ? null : event.game.id),
@@ -216,7 +296,9 @@ function formatEventData(event) {
         instant_game_update_data: event.instant_game_update_data
       };
     case "GameScoreExtensibleMessageAdminText":
-      return { game_type: event.game_type };
+      return {
+        game_type: event.game_type
+      };
     case "RtcCallLogExtensibleMessageAdminText":
       return {
         event: event.event,
@@ -264,28 +346,32 @@ function formatEventData(event) {
     case "LightweightEventDeleteExtensibleMessageAdminText":
       return {};
     default:
-      return { error: "Don't know what to with event data type " + event.__typename };
+      return {
+        error: "Don't know what to with event data type " + event.__typename
+      };
   }
 }
 
 function formatMessagesGraphQLResponse(data) {
   var messageThread = data.o0.data.message_thread;
-  var threadID = messageThread.thread_key.thread_fbid ? messageThread.thread_key.thread_fbid : messageThread.thread_key.other_user_id;
+  var threadID = messageThread.thread_key.thread_fbid
+    ? messageThread.thread_key.thread_fbid
+    : messageThread.thread_key.other_user_id;
 
-  var messages = messageThread.messages.nodes.map(function (d) {
+  var messages = messageThread.messages.nodes.map(function(d) {
     switch (d.__typename) {
       case "UserMessage":
         // Give priority to stickers. They're seen as normal messages but we've
         // been considering them as attachments.
         var maybeStickerAttachment;
-        if (d.sticker) {
+        if (d.sticker && d.sticker.pack) {
           maybeStickerAttachment = [
             {
               type: "sticker",
               ID: d.sticker.id,
               url: d.sticker.url,
 
-              packID: d.sticker.pack.id,
+              packID: d.sticker.pack ? d.sticker.pack.id : null,
               spriteUrl: d.sticker.sprite_image,
               spriteUrl2x: d.sticker.sprite_image_2x,
               width: d.sticker.width,
@@ -308,7 +394,9 @@ function formatMessagesGraphQLResponse(data) {
 
         var mentionsObj = {};
         if (d.message !== null) {
-          d.message.ranges.forEach(e => mentionsObj[e.entity.id] = d.message.text.substr(e.offset, e.length));
+          d.message.ranges.forEach(e => {
+            mentionsObj[e.entity.id] = d.message.text.substr(e.offset, e.length);
+          });
         }
 
         return {
@@ -331,7 +419,9 @@ function formatMessagesGraphQLResponse(data) {
           isUnread: d.unread,
 
           // New
-          messageReactions: d.message_reactions ? d.message_reactions.map(formatReactionsGraphQL) : null,
+          messageReactions: d.message_reactions
+            ? d.message_reactions.map(formatReactionsGraphQL)
+            : null,
           isSponsored: d.is_sponsored,
           snippet: d.snippet
         };
@@ -345,7 +435,9 @@ function formatMessagesGraphQLResponse(data) {
           timestamp: d.timestamp_precise,
           eventType: "change_thread_name",
           snippet: d.snippet,
-          eventData: { threadName: d.thread_name },
+          eventData: {
+            threadName: d.thread_name
+          },
 
           // @Legacy
           author: d.message_sender.id,
@@ -362,21 +454,26 @@ function formatMessagesGraphQLResponse(data) {
           timestamp: d.timestamp_precise,
           eventType: "change_thread_image",
           snippet: d.snippet,
-          eventData: d.image_with_metadata == null
-            ? {} /* removed image */
-            : {
-              /* image added */
-              threadImage: {
-                attachmentID: d.image_with_metadata.legacy_attachment_id,
-                width: d.image_with_metadata.original_dimensions.x,
-                height: d.image_with_metadata.original_dimensions.y,
-                url: d.image_with_metadata.preview.uri
-              }
-            },
+          eventData:
+            d.image_with_metadata == null
+              ? {} /* removed image */
+              : {
+                  /* image added */
+                  threadImage: {
+                    attachmentID: d.image_with_metadata.legacy_attachment_id,
+                    width: d.image_with_metadata.original_dimensions.x,
+                    height: d.image_with_metadata.original_dimensions.y,
+                    url: d.image_with_metadata.preview.uri
+                  }
+                },
 
           // @Legacy
           logMessageType: "log:thread-icon",
-          logMessageData: { thread_icon: d.image_with_metadata ? d.image_with_metadata.preview.uri : null }
+          logMessageData: {
+            thread_icon: d.image_with_metadata
+              ? d.image_with_metadata.preview.uri
+              : null
+          }
         };
       case "ParticipantLeftMessage":
         return {
@@ -390,7 +487,7 @@ function formatMessagesGraphQLResponse(data) {
           snippet: d.snippet,
           eventData: {
             // Array of IDs.
-            participantsRemoved: d.participants_removed.map(function (p) {
+            participantsRemoved: d.participants_removed.map(function(p) {
               return p.id;
             })
           },
@@ -398,7 +495,7 @@ function formatMessagesGraphQLResponse(data) {
           // @Legacy
           logMessageType: "log:unsubscribe",
           logMessageData: {
-            leftParticipantFbId: d.participants_removed.map(function (p) {
+            leftParticipantFbId: d.participants_removed.map(function(p) {
               return p.id;
             })
           }
@@ -415,7 +512,7 @@ function formatMessagesGraphQLResponse(data) {
           snippet: d.snippet,
           eventData: {
             // Array of IDs.
-            participantsAdded: d.participants_added.map(function (p) {
+            participantsAdded: d.participants_added.map(function(p) {
               return p.id;
             })
           },
@@ -423,7 +520,7 @@ function formatMessagesGraphQLResponse(data) {
           // @Legacy
           logMessageType: "log:subscribe",
           logMessageData: {
-            addedParticipants: d.participants_added.map(function (p) {
+            addedParticipants: d.participants_added.map(function(p) {
               return p.id;
             })
           }
@@ -481,20 +578,15 @@ function formatMessagesGraphQLResponse(data) {
   return messages;
 }
 
-module.exports = function (defaultFuncs, api, ctx) {
-  return function getThreadHistoryGraphQL(threadID, amount, timestamp, callback) {
-    var resolveFunc = function () { };
-    var rejectFunc = function () { };
-    var returnPromise = new Promise(function (resolve, reject) {
-      resolveFunc = resolve;
-      rejectFunc = reject;
-    });
-
+module.exports = function(defaultFuncs, api, ctx) {
+  return function getThreadHistoryGraphQL(
+    threadID,
+    amount,
+    timestamp,
+    callback
+  ) {
     if (!callback) {
-      callback = function (err, data) {
-        if (err) return rejectFunc(err);
-        resolveFunc(data);
-      };
+      throw { error: "getThreadHistoryGraphQL: need callback" };
     }
 
     // `queries` has to be a string. I couldn't tell from the dev console. This
@@ -519,19 +611,22 @@ module.exports = function (defaultFuncs, api, ctx) {
     defaultFuncs
       .post("https://www.facebook.com/api/graphqlbatch/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
-      .then(function (resData) {
-        if (resData.error) throw resData;
+      .then(function(resData) {
+        if (resData.error) {
+          throw resData;
+        }
         // This returns us an array of things. The last one is the success /
         // failure one.
         // @TODO What do we do in this case?
-        if (resData[resData.length - 1].error_results !== 0) throw new Error("There was an error_result.");
+        if (resData[resData.length - 1].error_results !== 0) {
+          throw new Error("well darn there was an error_result");
+        }
+
         callback(null, formatMessagesGraphQLResponse(resData[0]));
       })
-      .catch(function (err) {
+      .catch(function(err) {
         log.error("getThreadHistoryGraphQL", err);
         return callback(err);
       });
-
-    return returnPromise;
   };
 };
