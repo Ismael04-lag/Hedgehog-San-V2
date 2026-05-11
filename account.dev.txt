@@ -1,9 +1,0 @@
-[
-    {"key":"ps_l","value":"1","domain":".facebook.com","path":"/"},
-    {"key":"datr","value":"M8IAar6iZMnMAdE8L23jlRRF","domain":".facebook.com","path":"/"},
-    {"key":"fr","value":"1yXzkFMUY1oBN10u9.AWdnuve9gzPUe5RrDhPrHa78n4ueDNzPk0edpJc_wiaH1jUS6No.Bp-CMd..AAA.0.0.BqAXSz.AWeP6niwlQ__pJoT1DhzbbQBGVw","domain":".facebook.com","path":"/"},
-    {"key":"xs","value":"38%3A7YY-LHLKI5xbng%3A2%3A1778434612%3A-1%3A-1","domain":".facebook.com","path":"/"},
-    {"key":"c_user","value":"61570640307484","domain":".facebook.com","path":"/"},
-    {"key":"sb","value":"22jeaRpeXKsZa-hJT3ewIBrK","domain":".facebook.com","path":"/"},
-    {"key":"locale","value":"fr_FR","domain":".facebook.com","path":"/"}
-]
